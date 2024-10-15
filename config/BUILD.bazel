@@ -1,0 +1,81 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+
+package(default_visibility = ["//visibility:public"])
+
+# This flag controls whether the `filegroup`s that are set up for external
+# dependencies are permitted to depend on directories instead of expanding out
+# their contents via `glob`s.
+#
+# This can also be controlled via the `--external_deps_fuzzy_directories` flag
+# (see .bazelrc).
+#
+# You should not use this flag or the config setting below directly; see:
+# `//utils:external_deps_filegroup.bzl` for more details.
+#
+# NOTE: this defaults to `False` to support vanilla Bazel where enabling this
+# setting is problematic for two reasons:
+#   - directory inputs yield an unsoundness warning
+#   - directory inputs that overlap (i.e. `/a/b` and `/a/b/c`) produce sandbox
+#     setup errors
+#
+# See `.bazelrc` and the `strict_sandboxing` configuration; when using strict
+# sandboxing (i.e. this implies use of the Bazel fork) this is enabled to
+# reduce sandboxing overhead.
+bool_flag(
+    name = "allow_external_deps_filegroup_directory_fuzziness",
+    build_setting_default = False,
+)
+config_setting(
+    name = "external_deps_fuzzy_directories",
+    flag_values = {
+        ":allow_external_deps_filegroup_directory_fuzziness": "True",
+    },
+)
+# NOTE: For a sense of what kind of impact ^ has on build times, here's some
+# data from February 2024:
+#
+# Benchmarking methodology: hot daemon but `--disk_cache=''` and `bazel clean`
+# before invocation, three runs for each.
+#
+# for Bazel 7.0.0 (upstream), a target consisting of ~200 actions:
+#   - with `external_deps_fuzzy_directories=true`: 20.5s to 21s
+#   - with `external_deps_fuzzy_directories=false`: 20.8s to 21.5s
+#
+# for the Bazel fork, 2023-12-12, building the same target, with:
+#  - with `external_deps_fuzzy_directories=true`: 20.8s
+#  - with `external_deps_fuzzy_directories=false`: 25s (?)
+#    + haven't dug into why this is but my guess is that the sandbox setup
+#      changes have material perf overhead for "external" files (like all the
+#      Python stdlib files), perhaps due to the symlink resolution/collection...
+#      even when not using the hermetic sandbox?
+#  - with `--config=strict_sandboxing`:
+#    + with `external_deps_fuzzy_directories=true`: 20.4s to 21.1s
+#      * as we'd hope: lower file count brings speeds back to normal
+#    + with `external_deps_fuzzy_directories=false`: ~31.5s
+#      * as expected, extra sandbox setup time
+#
+# Didn't collect chrome traces or analyze memory usage but presumably they'd
+# tell a similar story.
+
+################################################################################
+
+# This is necessary when using the strict (hermetic) sandbox. However we cannot
+# enable this by default because upstream Bazel does not propagate deps from
+# the test runtime attributes.
+#
+# See `//deps/test` for details.
+#
+# So, this should only be enabled when using the Bazel fork. `.bazelrc` takes
+# care of this; see the `common:strict_sandboxing` options.
+bool_flag(
+    name = "use_custom_test_runtime_with_deps_listed",
+    build_setting_default = False,
+)
+config_setting(
+    name = "custom_test_runtime_with_deps_listed",
+    flag_values = {
+        "use_custom_test_runtime_with_deps_listed": "True",
+    },
+)
+
+################################################################################

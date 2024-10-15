@@ -1,0 +1,64 @@
+# Resources:
+#  - https://bazel.build/run/bazelrc
+#  - https://blog.aspect.dev/bazelrc-flags
+#  - https://docs.aspect.build/guides/bazelrc/
+#  - https://bazel.build/versions/7.0.0/reference/command-line-reference
+
+## Misc:
+common --experimental_sibling_repository_layout=true # see: https://github.com/bazelbuild/bazel/issues/12821
+common --experimental_repo_remote_exec=true
+common --attempt_to_print_relative_paths=true
+common --nolegacy_external_runfiles
+
+## User settings:
+
+# External deps filegroup control; see `//config`.
+common --flag_alias=external_deps_fuzzy_directories=@//config:allow_external_deps_filegroup_directory_fuzziness
+
+## Sandboxing:
+
+# sanitize `PATH` for actions:
+common --incompatible_strict_action_env=true
+
+# no unsandboxed execution unless we say so.
+common --incompatible_legacy_local_fallback=false # see: https://github.com/bazelbuild/bazel/issues/16522
+
+# disallow the `local` spawn strategy
+#
+# while we don't specify `linux-sandbox`/`darwin-sandbox` explicitly here we
+# expect that Bazel will use it when possible
+common --spawn_strategy=remote,worker,sandboxed
+
+# Stricter sandboxing options: no network access, sanitized host/user name:
+common --sandbox_default_allow_network=false
+common --sandbox_fake_hostname=true
+common --sandbox_fake_username=true
+common --worker_sandboxing=true
+
+# Even stricter sandboxing options (gated).
+#
+# This config (`--config=strict_sandboxing`) is intended for use with the Bazel
+# fork; see `README.md`.
+common:strict_sandboxing --experimental_use_hermetic_linux_sandbox=true
+common:strict_sandboxing --incompatible_sandbox_hermetic_tmp=true
+common:strict_sandboxing --spawn_strategy=remote,worker,linux-sandbox # disallow the processwrapper sandbox
+
+# See `//config:BUILD.bazel` and `//deps/test`.
+#
+# When using strict sandboxing we must list the deps needed by the test
+# machinery. However doing so requires a Bazel patch (which is why this setting
+# is default disabled).
+#
+# It is assumed if you are using `strict_sandboxing` you are using the Bazel
+# fork (see `README.md`).
+common:strict_sandboxing --@//config:use_custom_test_runtime_with_deps_listed=True
+# TODO!
+
+# See `//config:BUILD.bazel`. This option makes use of extra functionality in
+# the Bazel fork to trade precise dep tracking of external dependencies for
+# lower sandboxing overhead.
+common:strict_sandboxing --external_deps_fuzzy_directories=true
+
+## User config:
+# note: intentionally at the end (for priority)
+try-import %workspace%/.user.bazelrc

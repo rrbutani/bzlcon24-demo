@@ -1,0 +1,7 @@
+## nix stuff
+/.direnv
+/result
+
+## bazel stuff
+/bazel-*
+MODULE.bazel.lock

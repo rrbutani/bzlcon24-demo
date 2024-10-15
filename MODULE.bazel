@@ -1,0 +1,44 @@
+
+module(name = "sandbox-demo", bazel_compatibility = [])
+
+# See: https://registry.bazel.build
+bazel_dep(name = "platforms", version = "0.0.10")
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "rules_sh", version = "0.4.0")
+bazel_dep(name = "rules_python", version = "0.36.0")
+
+################################################################################
+
+# Disable the built-in `rules_sh` toolchains:
+use_extension("@rules_sh//bzlmod:extensions.bzl", "sh_configure").local_posix_config(
+    enable = False,
+)
+
+# Set up the host deps repo:
+host_deps = use_repo_rule("//deps/host_libs:host_deps_info.bzl", "host_deps_repo")
+host_deps(name = "host_deps")
+
+new_local_repository = use_repo_rule("//utils:starlark_new_local_repository.bzl", "new_local_repository")
+new_local_repository(
+    name = "foo",
+    build_file_content = """
+load("@host_deps//:info.bzl", "get_label_for_binary_path")
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "prelude",
+    srcs = [":assets/prelude"],
+)
+
+filegroup(
+    name = "frob",
+    srcs = [":bin/frob"],
+    data = [
+        get_label_for_binary_path("/bin/head"),
+    ],
+)
+""",
+    path = "/nfs/projects/foo/latest/",
+    top_level_symlinks = ["assets", "bin"],
+)

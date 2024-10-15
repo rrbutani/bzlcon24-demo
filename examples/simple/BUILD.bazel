@@ -1,0 +1,33 @@
+
+load("@bazel_skylib//rules:native_binary.bzl", "native_binary")
+load("@host_deps//:info.bzl", "get_label_for_binary_path")
+
+native_binary(
+    name = "script",
+    out = "script.sh",
+    src = ":script.sh",
+    data = [
+        "@foo//:prelude",
+        "@foo//:frob",
+    ],
+)
+
+genrule(
+    name = "simple",
+    srcs = ["BUILD.bazel"],
+    outs = ["out"],
+    cmd = "$(execpath :script) $< $@",
+    tools = [
+        ":script",
+
+        get_label_for_binary_path("/bin/bash"),
+
+        get_label_for_binary_path("/bin/env"),
+        get_label_for_binary_path("/bin/dirname"),
+        get_label_for_binary_path("/bin/mkdir"),
+        get_label_for_binary_path("/bin/cat"),
+
+        # get_label_for_binary_path("/bin/ls"),
+        # get_label_for_binary_path("/usr/bin/tree"),
+    ],
+)

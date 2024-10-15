@@ -1,0 +1,23 @@
+
+
+load("//rules/python:defs.bzl", "py_binary", "py_requirement")
+
+py_binary(
+    name = "update_shared_libs",
+    deps = [
+        py_requirement("pyelftools"),
+        py_requirement("lddtree"),
+    ],
+    srcs = ["update_shared_libs.py"],
+    visibility = ["//visibility:public"],
+)
+
+# NOTE: omitting in this repo for simplicity but you'd want a test here to
+# ensure that `host_deps_info.bzl` is up to date with itself (i.e. that it's
+# been regenerated if the input lists have been modified).
+#
+# Such a test should be granted an exemption from the strict sandboxing strategy
+# so that it can freely inspect the host system:
+# ```bazelrc
+# common --strategy_regexp='//deps/host_libs:regenerated_dep_info=local'
+# ```

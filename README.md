@@ -11,6 +11,8 @@
 > This repo demonstrates the use of the [extended Bazel linux sandbox](TODO: fork link, talk link) to describe all "host system" dependencies.
 >
 > In doing do we end up talking about system specific details and paths (i.e. of shared objects) — while it's possible to model these details in a system agnostic way in Bazel (i.e. by using repository rules that do auto-detection) for the sake of this example, for simplicity, we use a [Docker container](./Dockerfile) to define a common system environment.
+>
+> This repo also cuts some concerns when it comes to modeling host dependencies in a composable way — in reality we'd like to use toolchains for this but for simplicity this demo does not do so.
 
 > [!IMPORTANT]
 > This repo only works with x86_64 Linux — in theory adapting what's here to other architectures (aarch64, armv7, riscv64) should be straight-forward but it has not been attempted.
