@@ -119,19 +119,104 @@ STAGE2
 FROM ${BASE_IMAGE}
 SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]
 
-COPY --from=bazel_build /bin/bazel /bin/bazel
+ARG CLANG_VER
+RUN <<DEPS
+    declare -a deps
+    deps+=(
+        git=1:2.43.0-1ubuntu7.1
 
-RUN <<BLOCK
+        python3=3.12.3-0ubuntu2
+        python3-pip=24.0+dfsg-1ubuntu1
+        pax-utils=1.3.7-1 # for lddtree
 
-BLOCK
+        git-delta=0.16.5-5
 
-ARG BASE_IMAGE BAZEL_FORK_GIT_REPO_URL BAZEL_FORK_TAG
+        clang-$(echo ${CLANG_VER} | cut -d':' -f2 | cut -d. -f1)=${CLANG_VER}
+
+        curl tree
+    )
+    apt update
+    apt install -y "${deps[@]}"
+DEPS
+
+
+# In practice we would use the repo rules in `@rules_python` to handle such
+# deps... this is a contrived example to demonstrate how we might handle python
+# deps that aren't publicly available and are hard to manage the installation of
+# via repo rules.
+RUN <<PYDEPS
+    declare -a pydeps
+    pydeps+=(
+        pyelftools==0.31
+    )
+    pip install --break-system-packages "${pydeps[@]}"
+PYDEPS
+
+ARG BAZEL_VER=7.3.2
+RUN <<BAZEL
+    curl -L https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VER}/bazel-${BAZEL_VER}-linux-x86_64 -o /bin/bazel${BAZEL_VER}
+    chmod +x /bin/bazel${BAZEL_VER}
+    ln -s /bin/bazel${BAZEL_VER} /bin/bazel7
+    ln -s /bin/bazel7 /bin/bazel
+BAZEL
+
+# NOTE: for now, using the stage1 build instead of stage2 —
+# `--allow security.insecure` requires extra daemon configuration, annoying for
+# folks trying to give this a spin.
+COPY --from=bazel_build_stage1 /bin/bazel /bin/bazel-fork-bin
+
+# Pre-extract the install base, use an output base on `/tmp`:
+ARG BAZEL_FORK_TAG
+RUN cat >> /etc/bazel.bazelrc <<-CONFIG
+	# Use output base on tmpfs:
+    startup --output_user_root=/tmp/bazel
+CONFIG
+RUN <<WRAPPER
+    {
+        echo "#!/usr/bin/env bash"
+        echo "exec /bin/bazel-fork-bin --install_base=/bin/bazel-install-bases/${BAZEL_FORK_TAG}" '"$@"'
+    } > /bin/bazel-fork
+    chmod +x /bin/bazel-fork
+
+    ln -s /bin/bazel-fork "/bin/bazel'"
+WRAPPER
+RUN --mount=type=tmpfs,target=/tmp <<INSTALL_BASE
+    cd "$(mktemp -d)"
+    touch MODULE.bazel
+    bazel-fork info
+INSTALL_BASE
+
+RUN <<EXTERNAL_ARTIFACTS
+    base=/nfs/special/project/area/foo/
+    ver=1.0.0
+
+    mkdir -p /nfs/mutable_space/special
+    ln -s /nfs/mutable_space/special /nfs/special
+    mkdir -p /nfs/a/area
+    ln -s /nfs/a/ /nfs/mutable_space/special/project
+    mkdir -p ${base}${ver}/{assets,bin}
+    ln -s ${ver} ${base}/latest
+    mkdir -p /nfs/projects
+    ln -s ${base} /nfs/projects/foo
+
+    echo "hey there bazelcon!" > ${base}/${ver}/assets/prelude
+    {
+        echo "#!/usr/bin/env bash"
+        echo "echo '# first 10 lines:'"
+        echo "exec head"
+    } > ${base}/${ver}/bin/frob
+    chmod +x ${base}/${ver}/bin/frob
+
+    chown -R ubuntu ${base}
+    chmod -R a+rw ${base}
+EXTERNAL_ARTIFACTS
+
+ARG BASE_IMAGE BAZEL_FORK_GIT_REPO_URL
 LABEL base_image=${BASE_IMAGE} \
       bazel.fork.url=${BAZEL_FORK_GIT_REPO_URL} \
-      bazel.fork.tag=${BAZEL_FORK_TAG}
+      bazel.fork.tag=${BAZEL_FORK_TAG} \
+      clang.version=${CLANG_VER}
 
-# TODO: mounts?
-
-# TODO: /etc/bazelrc
-#   - install base
-#   - tmp user output root
+# NOTE: change as needed; may need to create a new user so the uid/gid aligns
+USER ubuntu
+WORKDIR /workarea

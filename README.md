@@ -27,3 +27,12 @@
 ```
 
 [^caveat]: unfortunately scoping down the permissions to `-cap-add=SYS_ADMIN --cap-add=CAP_SYS_CHROOT` isn't sufficient — still yields permission errors for `mount`, have not investigated..
+
+```console
+❯ docker run \
+    --privileged \
+    -v "$(pwd)":/workarea \
+    ${https_proxy+--env HTTPS_PROXY="$https_proxy"} \
+    --tmpfs /tmp:exec \
+    -it bzl-sandbox-demo bash
+```

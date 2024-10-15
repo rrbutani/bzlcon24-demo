@@ -95,7 +95,7 @@
 
     devShells.default = np.mkShell {
       nativeBuildInputs = with np; [
-        self.packages.${sys}.bazel_custom
+        self.packages.${sys}.bazel # _custom
         buildifier
       ];
     };
