@@ -60,8 +60,8 @@ RUN cat > user.bazelrc <<-OPTS
 	# Record timestamp:
 	common --stamp
 
-    # Use remote JDK:
-    common --java_runtime_version=remotejdk_17
+	# Use remote JDK:
+	common --java_runtime_version=remotejdk_17
 
 	# Embed version and commit hash in binary:
 	common --embed_label="$(
@@ -73,7 +73,7 @@ RUN cat > user.bazelrc <<-OPTS
 	    # NOTE: `get_last_version` has a bug? always calls `date` instead of
 	    # using `git_date` (TODO(rrbutani)):
 	    # https://github.com/bazelbuild/bazel/blame/788b6080f54c6ca5093526023dfd9b12b90403f8/scripts/bootstrap/buildenv.sh#L279
-	    set +u; source scripts/bootstrap/buildenv.sh;
+	    set +u +e; source scripts/bootstrap/buildenv.sh || :;
 	    echo "$(get_last_version) (@$(git_sha1)-${BAZEL_FORK_TAG})"
 	)"
 

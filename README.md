@@ -23,7 +23,7 @@
 ```console
 ❯ docker build \
     ${https_proxy+--build-arg HTTPS_PROXY="$https_proxy"} \
-    -t bzlcon24-demo - < Dockerfile
+    -t bzl-sandbox-demo - < Dockerfile
 ```
 
 [^caveat]: unfortunately scoping down the permissions to `-cap-add=SYS_ADMIN --cap-add=CAP_SYS_CHROOT` isn't sufficient — still yields permission errors for `mount`, have not investigated..
